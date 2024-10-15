@@ -1,0 +1,71 @@
+//command: decifrar
+cryptools = include_lib("/lib/crypto.so")
+if not cryptools then exit("Error: Missing crypto library")
+
+// get cache
+cache_folder = get_shell.host_computer.File(home_dir + "/Config/decypherTable")
+cache = {}
+
+print("loading cache")
+for cache_file in cache_folder.get_files
+	cache_file_content = cache_file.get_content
+	
+	if cache_file_content != "" then
+		passwords = cache_file_content.split("\n")
+		for pass in passwords
+			if pass.len == 0 then continue
+			pass = pass.split("=")
+			cache[pass[0]] = pass[1]
+		end for
+	end if
+end for
+//print(cache)
+
+while true
+input = user_input("type a file path or a user:password \n", false)
+
+// check if input is a file
+is_file = true
+if input.indexOf(":") then is_file = false
+
+// set passwords to decipher
+if is_file then
+	file = get_shell.host_computer.File(input)
+	if not file then exit("decifrar: can't find " + input)
+	if not file.has_permission("r") then exit("can't read file. Permission denied")
+	if file.get_content.len == 0 then exit("decipher: no users found")
+	works = file.get_content.split("\n") 
+else
+	works = input.split(" ")
+end if
+//print(works)
+
+for i in range(0, works.len - 1)
+	work = works[i].split(":")
+	user = work[0]
+	password = work[1]
+	
+	if cache.hasIndex(password) then
+		password = cache[password]
+	else
+		decyphed_password = cryptools.decipher(password)
+		if not decyphed_password then
+			print("can't find the password")
+			continue 
+		end if
+		if cache_file_content > 79900 then
+			next_file = cache_file.name.to_int + 1
+			next_file = next_file + ""
+			get_shell.host_computer.touch(cache_folder.path, next_file)
+			cache_file = get_shell.host_computer.File(cache_folder.path + "/" + next_file	)
+		end if
+		z = cache_file.set_content(cache_file_content + "\n" + password + "=" + decyphed_password)
+		if z != 1 then exit(z)
+		password = decyphed_password
+	end if
+	
+	works[i] = user + ":" + password
+	print(works[i])
+end for
+
+end while
